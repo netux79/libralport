@@ -289,7 +289,6 @@ static void *load_file_object(PACKFILE *f, long size)
    if (failed)
    {
       unload_datafile(dat);
-      free(dat);
       dat = NULL;
    }
 
