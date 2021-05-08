@@ -814,7 +814,7 @@ void mixer_mix(signed short *buf)
 /* mixer_init_voice:
  *  Initialises the specificed voice ready for playing a sample.
  */
-void mixer_init_voice(int voice, const SAMPLE *sample)
+static void mixer_init_voice(int voice, const SAMPLE *sample)
 {
    mixer_voice[voice].sample = sample;
    mixer_voice[voice].autokill = FALSE;
@@ -839,7 +839,7 @@ void mixer_init_voice(int voice, const SAMPLE *sample)
 /* mixer_release_voice:
  *  Releases a voice when it is no longer required.
  */
-void mixer_release_voice(int voice)
+static void mixer_release_voice(int voice)
 {
    mixer_voice[voice].playing = FALSE;
    mixer_voice[voice].data.buffer = NULL;
@@ -1119,6 +1119,38 @@ void voice_set_position(int voice, int position)
       mixer_voice[voice].pos = (position << MIX_FIX_SHIFT);
       if (mixer_voice[voice].pos >= mixer_voice[voice].len)
          mixer_voice[voice].playing = FALSE;
+   }
+}
+
+
+/* voice_get_pan:
+ *  Returns the current pan position of a voice, or -1 if that cannot
+ *  be determined (because it has finished or been preempted by a
+ *  different sound).
+ */
+int voice_get_pan(int voice)
+{
+   int pan;
+
+   if (mixer_voice[voice].sample)
+      pan = mixer_voice[voice].pan >> 12;
+   else
+      pan = -1;
+
+   return pan;
+}
+
+
+
+/* voice_set_pan:
+ *  Sets the pan position of a voice.
+ */
+void voice_set_pan(int voice, int pan)
+{
+   if (mixer_voice[voice].sample)
+   {
+      mixer_voice[voice].pan = pan << 12;
+      _update_volume_indexes(mixer_voice + voice);
    }
 }
 
