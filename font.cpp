@@ -292,7 +292,7 @@ void textout_ex(BITMAP *bmp, const FONT *f, const char *str, int x, int y,
                 int fg, int bg)
 {
    int ch = 0;
-   const char *p = str;
+   const unsigned char *p = (const unsigned char *)str;
 
    while ((ch = *p++))
       x += _render_char(f, ch, fg, bg, bmp, x, y);
@@ -323,7 +323,7 @@ void textprintf_ex(BITMAP *bmp, const FONT *f, int x, int y, int fg, int bg,
    va_list ap;
 
    va_start(ap, format);
-   sprintf(buf, format, ap);
+   vsprintf(buf, format, ap);
    va_end(ap);
 
    textout_ex(bmp, f, buf, x, y, fg, bg);
