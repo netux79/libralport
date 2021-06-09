@@ -245,7 +245,6 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
    int syinc; /* amount to increment src y each time */
    int ycdec; /* amount to deccrement counter by, increase sy when this reaches 0 */
    int ycinc; /* amount to increment counter by when it reaches 0 */
-   int size = 0; /* pixel size */
    int dxbeg, dxend; /* clipping information */
    int dybeg, dyend;
    int i;
@@ -277,13 +276,13 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
    ycdec = sh - (syinc * dh);
    ycinc = dh - ycdec;
    yc = ycinc;
-   sxofs = sx * size;
-   dxofs = dx * size;
+   sxofs = sx;
+   dxofs = dx;
 
-   _al_stretch.sxinc = sw / dw * size;
+   _al_stretch.sxinc = sw / dw;
    _al_stretch.xcdec = sw - ((sw / dw) * dw);
    _al_stretch.xcinc = dw - _al_stretch.xcdec;
-   _al_stretch.linesize = (dxend - dxbeg) * size;
+   _al_stretch.linesize = (dxend - dxbeg);
 
    /* get start state (clip) */
    _al_stretch.xcstart = _al_stretch.xcinc;
@@ -292,13 +291,13 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
       if (_al_stretch.xcstart <= 0)
       {
          _al_stretch.xcstart += _al_stretch.xcinc;
-         sxofs += size;
+         sxofs++;
       }
       else
          _al_stretch.xcstart -= _al_stretch.xcdec;
    }
 
-   dxofs += i * size;
+   dxofs += i;
 
    /* skip clipped lines */
    for (y = dy; y < dybeg; y++, sy += syinc)
@@ -313,7 +312,6 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
    }
 
    /* Stretch it */
-
    for (; y < dyend; y++, sy += syinc)
    {
       stretch_line(dst->line[y] + dxofs, src->line[sy] + sxofs);
