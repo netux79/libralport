@@ -2,16 +2,37 @@
 #include "alport.h"
 
 
-/* Warning: No bound check is performed */
 void putpixel(BITMAP *bmp, int x, int y, int color)
 {
+   if(bmp->clip) 
+   {
+      if (y < bmp->ct)
+         return;
+      if (y >= bmp->cb)
+         return;
+      if (x < bmp->cl)
+         return;
+      if (x >= bmp->cr)
+         return;
+   }
+
    *(bmp->line[y] + x) = color;
 }
 
-
-/* Warning: No bound check is performed */
 void hline(BITMAP *bmp, int x1, int y, int x2, int color)
 {
+   if (bmp->clip)
+   {
+     if (x1 < bmp->cl)
+         x1 = bmp->cl;
+
+      if (x2 >= bmp->cr)
+         x2 = bmp->cr - 1;
+
+      if (y < bmp->ct || y >= bmp->cb)
+         return;
+   }
+
    unsigned char *d = bmp->line[y] + x1;
    memset(d, color, x2 - x1 + 1);
 }
