@@ -140,7 +140,7 @@ void put_backslash(char *filename)
  */
 char *replace_filename(char *dest, const char *path, const char *filename)
 {
-   char tmp[1024];
+   char tmp[1024] = {'\0'};
    int pos, c;
 
    pos = strlen(path);
@@ -169,7 +169,7 @@ char *replace_filename(char *dest, const char *path, const char *filename)
  */
 char *replace_extension(char *dest, const char *filename, const char *ext)
 {
-   char tmp[1024];
+   char tmp[1024] = {'\0'};
    int pos, end, c;
 
    pos = end = strlen(filename);
