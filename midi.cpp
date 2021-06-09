@@ -284,8 +284,8 @@ void midi_fill_buffer(void)
       }
    }
 
-   seq->play(mtime, out);
    mtime += _delta;
+   seq->play(mtime, out);
 
    buf = (short *)midiSpl->data;
    out->synthesize(buf, _sample_size, _rate);
