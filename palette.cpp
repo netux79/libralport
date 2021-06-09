@@ -8,7 +8,6 @@ RGB_MAP *rgb_map = NULL;               /* RGB -> palette entry conversion */
 COLOR_MAP *color_map = NULL;           /* translucency/lighting table */
 
 /* default palette structures */
-PALETTE _current_palette;
 PALETTE black_palette =
 {
    {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0},
@@ -79,12 +78,6 @@ PALETTE black_palette =
 
 /* 1.5k lookup table for color matching */
 static unsigned int col_diff[3 * 128];
-
-
-void set_palette(const PALETTE p)
-{
-   memcpy(&_current_palette, &p, sizeof(PALETTE));
-}
 
 
 /* bestfit_init:
@@ -384,3 +377,4 @@ void *load_dat_palette(PACKFILE *f, long size)
 
    return p;
 }
+
