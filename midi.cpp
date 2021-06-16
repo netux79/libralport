@@ -279,7 +279,7 @@ void midi_fill_buffer(void)
       }
       else
       {
-         _playing = FALSE;
+         midi_stop();
          return;
       }
    }
