@@ -13,8 +13,7 @@ LDFLAGS=
 
 RANLIB=ranlib
 
-OBJS = lzss.o packfile.o datafile.o font.o bitmap.o primitive.o palette.o sound.o midi.o file.o fix.o \
-		fmmidi/midisynth.o fmmidi/sequencer.o
+OBJS = lzss.o packfile.o datafile.o font.o bitmap.o primitive.o palette.o sound.o midi.o file.o fix.o
 
 all: libalport.a
 
@@ -24,7 +23,6 @@ libalport.a: $(OBJS)
 
 clean:
 	rm -f *.o
-	rm -f fmmidi/*.o
 	rm -f libalport.a
 
 %.o : %.cpp

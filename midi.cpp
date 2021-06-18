@@ -1,7 +1,11 @@
 #include <string.h>
 #include <stdlib.h>
-#include "fmmidi/sequencer.h"
+#include <limits.h>
 #include "alport.h"
+#define TSF_IMPLEMENTATION
+#include "tsf/tsf.h"
+#define TML_IMPLEMENTATION
+#include "tsf/tml.h"
 
 
 #define BEL32(a)     ((a & 0xFF000000L) >> 24) | ((a & 0x00FF0000L) >> 8) | \
@@ -13,6 +17,9 @@
 #define MIDI_HDR_SIZE      14
 #define TRACK_HDR_SIZE     8
 #define SAMPLE_BIT_DEPTH   16
+#define VOLUME_GAIN        0.0f /* (>0 means higher, <0 means lower) */
+#define AUDIO_CHANNELS     2
+#define MAX_MIDI_SIZE      INT_MAX
 
 
 typedef struct MIDI_TRACK
@@ -21,13 +28,13 @@ typedef struct MIDI_TRACK
    int len;             /* length of the track data */
 } MIDI_TRACK;
 
-static SAMPLE *midiSpl; /* sample object to be used to pass the midi data to the mixer */
-static midisequencer::output *out;
-static midisequencer::sequencer *seq;
+static SAMPLE *midiSpl; /* sample object to pass midi output to the mixer */
+static tsf *tinySF;
+static tml_message *tml = NULL; /* pointer to first midi message */
+static tml_message *tmlNext = NULL; /* next midi message to be played */
 static float mtime = -1.0f;
-static float totalTime = 0.0f;
 static float _delta;
-static int mvoice = -1; /* voice index in the mixer to be used for the midi engine. */
+static int mvoice = -1; /* voice index in the mixer */
 static int _rate;
 static int _sample_size;
 static int _loop = FALSE;
@@ -35,7 +42,7 @@ static int _playing = FALSE;
 
 /* read_midi:
  *  Reads MIDI data from a packfile (in allegro MIDI format and
- * transform it to standard format to allow fmmidi processing).
+ * transform it to standard format to allow TSF engine processing).
  */
 void *read_midi(PACKFILE *f)
 {
@@ -141,28 +148,31 @@ void destroy_midi(void *midi)
 
 /* midi_init:
  *  Setup the midi engine to be used together with the mixer and
- * fmmidi library.
+ * tsf / tml engine.
  */
-int midi_init(int rate, float delta)
+int midi_init(int rate, float delta, const char *sf2_path)
 {
    /* Already initialized */
    if (mvoice >= 0)
       return FALSE;
 
-   out = new midisequencer::output();
-   seq = new midisequencer::sequencer();
-
    _rate = rate;
    _delta = delta;
    _sample_size = _rate * _delta;
 
-   /* Create a sample to store the output of fmmidi */
+   /* Load the SoundFont from a file */
+   tinySF = tsf_load_filename(sf2_path);
+   if (!tinySF)
+      return FALSE;
+
+   /* Set the SoundFont rendering output mode */
+   tsf_set_output(tinySF, TSF_STEREO_INTERLEAVED, _rate, VOLUME_GAIN);
+
+   /* Create a sample to store the output of TSF */
    midiSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _rate, _sample_size);
    if (!midiSpl)
    {
-      delete out;
-      delete seq;
-
+      tsf_close(tinySF);
       return FALSE;
    }
 
@@ -187,14 +197,16 @@ void midi_deinit(void)
 
    _playing = FALSE;
    mtime = -1.0f;
-   totalTime = 0.0f;
 
    deallocate_voice(mvoice);
    mvoice = -1;
 
    destroy_sample(midiSpl);
-   delete out;
-   delete seq;
+   tsf_close(tinySF);
+   if (tml)
+      tml_free(tml);
+
+   tmlNext = tml = NULL;
 }
 
 
@@ -213,14 +225,27 @@ int midi_play(void *midi, int loop)
    if (mvoice < 0 || !midi)
       return FALSE;
 
-   seq->clear();
-   if (!seq->load(midi))
+   /* release tml if a previous midi was on memory */
+   if (tml)
+      tml_free(tml);
+
+   /* Stop all playing notes immediatly and reset all channel 
+    * parameters. Initialize preset on special 10th MIDI channel 
+    * to use percussion sound bank (128) if available */
+   tsf_reset(tinySF);
+   tsf_channel_set_bank_preset(tinySF, 9, 128, 0);
+
+   /* Normally we need to pass the buffer size but in this case we 
+    * cheat since we don't have this value at this point 
+    * and it is not really used */
+   tml = tml_load_memory(midi, MAX_MIDI_SIZE);
+   if (!tml)
       return FALSE;
 
-   mtime = 0.0f;
-   totalTime = seq->get_total_time();
-   seq->rewind();
+   /* Set up the midi message pointer to the first MIDI message */
+   tmlNext = tml;
 
+   mtime = 0.0f;
    _loop = loop;
    _playing = TRUE;
 
@@ -238,19 +263,57 @@ void midi_stop(void)
       return;
 
    mtime = -1.0f;
-   totalTime = 0.0f;
    _loop = FALSE;
    _playing = FALSE;
+   tmlNext = NULL;
 }
 
-/* midi_get_length:
- *  Gets the total time in seconds of the currently playing
- * midi. Zero if no midi is being played.
- * It behaves different than the allegro version.
- */
-float midi_get_length(void)
+
+static void midi_render(short *buf, int frameCount)
 {
-   return totalTime;
+   int sampleBlock;
+
+   for (sampleBlock = TSF_RENDER_EFFECTSAMPLEBLOCK; frameCount; 
+        frameCount -= sampleBlock, buf += (sampleBlock * AUDIO_CHANNELS))
+   {
+      if (sampleBlock > frameCount) sampleBlock = frameCount;
+
+      /* Loop through all MIDI messages which need to be played up 
+       * until the current playback time */
+      for (mtime += sampleBlock * (1000.0 / _rate);
+           tmlNext && mtime >= tmlNext->time;
+           tmlNext = tmlNext->next)
+      {
+         switch (tmlNext->type)
+         {
+            case TML_PROGRAM_CHANGE: /* channel program (preset) change (special 
+                                      * handling for 10th MIDI channel with 
+                                      * drums) */
+               tsf_channel_set_presetnumber(tinySF, tmlNext->channel, 
+                                            tmlNext->program, 
+                                            (tmlNext->channel == 9));
+               break;
+            case TML_NOTE_ON: /* play a note */
+               tsf_channel_note_on(tinySF, tmlNext->channel, tmlNext->key, 
+                                   tmlNext->velocity / 127.0f);
+               break;
+            case TML_NOTE_OFF: /* stop a note */
+               tsf_channel_note_off(tinySF, tmlNext->channel, tmlNext->key);
+               break;
+            case TML_PITCH_BEND: /* pitch wheel modification */
+               tsf_channel_set_pitchwheel(tinySF, tmlNext->channel,
+                                          tmlNext->pitch_bend);
+               break;
+            case TML_CONTROL_CHANGE: /* MIDI controller messages */
+               tsf_channel_midi_control(tinySF, tmlNext->channel,
+                                        tmlNext->control, tmlNext->control_value);
+               break;
+         }
+      }
+
+      /* Render the block of audio samples in short format */
+      tsf_render_short(tinySF, buf, sampleBlock, 0);
+   }
 }
 
 
@@ -270,12 +333,12 @@ void midi_fill_buffer(void)
       return;
 
    /* reloop the song if needed */
-   if (mtime >= totalTime)
+   if (!tmlNext)
    {
       if (_loop)
       {
          mtime = 0;
-         seq->rewind();
+         tmlNext = tml; /* point again to the start message  */
       }
       else
       {
@@ -284,14 +347,11 @@ void midi_fill_buffer(void)
       }
    }
 
-   mtime += _delta;
-   seq->play(mtime, out);
-
    buf = (short *)midiSpl->data;
-   out->synthesize(buf, _sample_size, _rate);
+   midi_render(buf, _sample_size);
 
    /* Convert to unsigned as required by the mixer */
-   for (i = 0; i < _sample_size * 2; i++)
+   for (i = 0; i < _sample_size * AUDIO_CHANNELS; i++)
       buf[i] ^= 0x8000;
 
    /* queue the samples into the mixer */
@@ -320,16 +380,6 @@ void midi_resume(void)
       _playing = TRUE;
 }
 
-/* midi_time:
- *  Returns the current position of the playing midi
- * in seconds even if it's paused. Returns -1.0 if not
- * midi is being played.
- */
-float midi_time(void)
-{
-   return mtime;
-}
-
 
 /* midi_isplaying:
  *  Returns TRUE if a midi is set for playing (even if
@@ -338,28 +388,6 @@ float midi_time(void)
 int midi_isplaying(void)
 {
    return (mtime >= 0.0f);
-}
-
-
-/* midi_seek:
- *  Moves forwards the current midi playing position
- * offset seconds. Backwards if offset if negative.
- * Does nothing if no midi is playing.
- */
-void midi_seek(float offset)
-{
-   if (mtime < 0.0f)
-      return;
-
-   mtime += offset;
-
-   if (mtime < 0.0f)
-      mtime = 0.0f;
-
-   else if (mtime > totalTime)
-      mtime = totalTime;
-
-   seq->set_time(mtime, out);
 }
 
 
