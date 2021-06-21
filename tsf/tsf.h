@@ -1037,8 +1037,8 @@ static void tsf_voice_endquick(tsf* f, struct tsf_voice* v)
 	int repeats = (f->maxVoiceNum ? 2 : 1);
 	while (repeats--)
 	{
-		v->ampenv.parameters.release = 0.0f; tsf_voice_envelope_nextsegment(&v->ampenv, TSF_SEGMENT_SUSTAIN, f->outSampleRate);
-		v->modenv.parameters.release = 0.0f; tsf_voice_envelope_nextsegment(&v->modenv, TSF_SEGMENT_SUSTAIN, f->outSampleRate);
+		v->ampenv.parameters.release = 0.0f; tsf_voice_envelope_nextsegment(&v->ampenv, TSF_SEGMENT_RELEASE, f->outSampleRate);
+		v->modenv.parameters.release = 0.0f; tsf_voice_envelope_nextsegment(&v->modenv, TSF_SEGMENT_RELEASE, f->outSampleRate);
 	}
 }
 

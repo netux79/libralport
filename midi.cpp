@@ -337,7 +337,7 @@ void midi_fill_buffer(void)
    {
       if (_loop)
       {
-         mtime = 0;
+         mtime = 0.0f;
          tmlNext = tml; /* point again to the start message  */
       }
       else
