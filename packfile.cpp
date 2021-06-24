@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/stat.h>
 #include "alport.h"
 
 #ifndef O_BINARY
@@ -727,8 +728,8 @@ PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack)
                free(chunk);
                return NULL;
             }
-            chunk->normal.passpos = chunk->normal.passdata + (long)f->normal.passpos -
-                                    (long)f->normal.passdata;
+            chunk->normal.passpos = chunk->normal.passdata + (size_t)f->normal.passpos -
+                                    (size_t)f->normal.passdata;
             f->normal.passpos = f->normal.passdata;
          }
          chunk->normal.flags |= PACKFILE_FLAG_OLD_CRYPT;
@@ -857,8 +858,8 @@ PACKFILE *pack_fclose_chunk(PACKFILE *f)
       }
 
       if ((f->normal.passpos) && (f->normal.flags & PACKFILE_FLAG_OLD_CRYPT))
-         parent->normal.passpos = parent->normal.passdata + (long)f->normal.passpos -
-                                  (long)f->normal.passdata;
+         parent->normal.passpos = parent->normal.passdata + (size_t)f->normal.passpos -
+                                  (size_t)f->normal.passdata;
 
       free_packfile(f);
    }
