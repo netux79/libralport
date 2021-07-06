@@ -38,6 +38,8 @@ static int mvoice = -1; /* voice index in the mixer */
 static int _rate;
 static int _sample_size;
 static int _loop = FALSE;
+static int _loop_start = -1;
+static int _loop_end = -1;
 static int _playing = FALSE;
 
 /* read_midi:
@@ -247,6 +249,8 @@ int midi_play(void *midi, int loop)
 
    mtime = 0.0f;
    _loop = loop;
+   _loop_start = -1;
+   _loop_end = -1;
    _playing = TRUE;
 
    return TRUE;
@@ -269,6 +273,66 @@ void midi_stop(void)
 }
 
 
+/* process_midi_msg:
+ *  Process the current midi msg depending its type. If apply_note is false
+ * it skips the notes processing. Useful for the Fast Forward functionality.
+ */
+static void process_midi_msg(int apply_note)
+{
+   switch (tmlNext->type)
+   {
+      case TML_PROGRAM_CHANGE: /* channel program (preset) change (special 
+                                * handling for 10th MIDI channel with 
+                                * drums) */
+         tsf_channel_set_presetnumber(tinySF, tmlNext->channel, 
+                                      tmlNext->program, 
+                                      (tmlNext->channel == 9));
+         break;
+      case TML_NOTE_ON: /* play a note, skip on FF */
+         if (apply_note)
+            tsf_channel_note_on(tinySF, tmlNext->channel, tmlNext->key, 
+                                tmlNext->velocity / 127.0f);
+         break;
+      case TML_NOTE_OFF: /* stop a note, skip on FF */
+         if (apply_note)
+            tsf_channel_note_off(tinySF, tmlNext->channel, tmlNext->key);
+         break;
+      case TML_PITCH_BEND: /* pitch wheel modification */
+         tsf_channel_set_pitchwheel(tinySF, tmlNext->channel,
+                                    tmlNext->pitch_bend);
+         break;
+      case TML_CONTROL_CHANGE: /* MIDI controller messages */
+         tsf_channel_midi_control(tinySF, tmlNext->channel,
+                                  tmlNext->control, tmlNext->control_value);
+         break;
+   }
+}
+
+
+/* midi_fastforward:
+ *  Process the midi messages accordingly up to the target beat position.
+ * It skips notes messages to avoid any sound being applied. If -1 or 0 is
+ * provided as target or no midi is currently playing, no work will be done.
+ */
+void midi_fastforward(int target)
+{
+   if (mtime < 0.0f)
+      return;
+
+   /* Loop through all MIDI messages in the list until the target 
+    * beat number is reached */
+   for (; tmlNext && tmlNext->beat_no < target; tmlNext = tmlNext->next, 
+                                                mtime = tmlNext->time)
+      process_midi_msg(FALSE);
+}
+
+
+/* midi_render:
+ *  Process the midi messages accordingly to the requested frameCount
+ * and generated the audio into the provided buffer.
+ * If we reach the end of the song or the defined loop end, finish
+ * the processing.
+ */
 static void midi_render(short *buf, int frameCount)
 {
    int sampleBlock;
@@ -284,31 +348,14 @@ static void midi_render(short *buf, int frameCount)
            tmlNext && mtime >= tmlNext->time;
            tmlNext = tmlNext->next)
       {
-         switch (tmlNext->type)
+         /* stop processing if loop end is reached */
+         if (tmlNext->beat_no == _loop_end)
          {
-            case TML_PROGRAM_CHANGE: /* channel program (preset) change (special 
-                                      * handling for 10th MIDI channel with 
-                                      * drums) */
-               tsf_channel_set_presetnumber(tinySF, tmlNext->channel, 
-                                            tmlNext->program, 
-                                            (tmlNext->channel == 9));
-               break;
-            case TML_NOTE_ON: /* play a note */
-               tsf_channel_note_on(tinySF, tmlNext->channel, tmlNext->key, 
-                                   tmlNext->velocity / 127.0f);
-               break;
-            case TML_NOTE_OFF: /* stop a note */
-               tsf_channel_note_off(tinySF, tmlNext->channel, tmlNext->key);
-               break;
-            case TML_PITCH_BEND: /* pitch wheel modification */
-               tsf_channel_set_pitchwheel(tinySF, tmlNext->channel,
-                                          tmlNext->pitch_bend);
-               break;
-            case TML_CONTROL_CHANGE: /* MIDI controller messages */
-               tsf_channel_midi_control(tinySF, tmlNext->channel,
-                                        tmlNext->control, tmlNext->control_value);
-               break;
+            tmlNext = NULL; /* set to null to mark it as finished */
+            break;
          }
+
+         process_midi_msg(TRUE);
       }
 
       /* Render the block of audio samples in short format */
@@ -339,6 +386,13 @@ void midi_fill_buffer(void)
       {
          mtime = 0.0f;
          tmlNext = tml; /* point again to the start message  */
+
+         /* fast forward the song if loop start was set */
+         if (_loop_start > 0)
+         {
+            tsf_note_off_all(tinySF);
+            midi_fastforward(_loop_start);
+         }
       }
       else
       {
@@ -371,13 +425,37 @@ void midi_pause(void)
 
 /* midi_resume:
  *  Resumes music from playing after being paused.
- * Does nothing if not midi has been set for playing
+ * Does nothing if no midi has been set for playing
  * using play_midi().
  */
 void midi_resume(void)
 {
    if (mtime >= 0.0f)
       _playing = TRUE;
+}
+
+
+/* midi_loopstart:
+ *  Sets the loop start within the midi song.
+ * -1 means the original start of the midi.
+ * Does nothing if no midi has been set for playing.
+ */
+void midi_loopstart(int value)
+{
+   if (mtime >= 0.0f)
+      _loop_start = value;
+}
+
+
+/* midi_loopend:
+ *  Sets the loop end within the midi song.
+ * -1 means the original end of the midi.
+ * Does nothing if no midi has been set for playing.
+ */
+void midi_loopend(int value)
+{
+   if (mtime >= 0.0f)
+      _loop_end = value;
 }
 
 

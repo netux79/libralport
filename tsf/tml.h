@@ -75,6 +75,8 @@ typedef struct tml_message
 {
 	// Time of the message in milliseconds
 	unsigned int time;
+	// Beat (Quarter Note) Number of the message
+	int beat_no;
 
 	// Type (see TMLMessageType) and channel number
 	unsigned char type, channel;
@@ -418,6 +420,7 @@ TMLDEF tml_message* tml_load(struct tml_stream* stream)
 	{
 		tml_message *PrevMessage = TML_NULL, *Msg, *MsgEnd, Swap;
 		unsigned int ticks = 0, tempo_ticks = 0; //tick counter and value at last tempo change
+		int beat; //beat position
 		int step_smallest, msec, tempo_msec = 0; //msec value at last tempo change
 		double ticks2time = 500000 / (1000.0 * division); //milliseconds per tick
 
@@ -426,6 +429,7 @@ TMLDEF tml_message* tml_load(struct tml_stream* stream)
 		{
 			step_smallest = 0x7fffffff;
 			msec = tempo_msec + (int)((ticks - tempo_ticks) * ticks2time);
+			beat = (ticks / division) + 1;
 			for (t = tracks; t != tracksEnd; t++)
 			{
 				if (t->Idx == t->End) continue;
@@ -442,6 +446,7 @@ TMLDEF tml_message* tml_load(struct tml_stream* stream)
 					if (Msg->type)
 					{
 						Msg->time = msec;
+						Msg->beat_no = beat;
 						if (PrevMessage) { PrevMessage->next = Msg; PrevMessage = Msg; }
 						else { Swap = *Msg; *Msg = *messages; *messages = Swap; PrevMessage = messages; }
 					}
