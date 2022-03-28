@@ -7,11 +7,13 @@
 #define TML_IMPLEMENTATION
 #include "tsf/tml.h"
 
-
-#define BEL32(a)     ((a & 0xFF000000L) >> 24) | ((a & 0x00FF0000L) >> 8) | \
-                     ((a & 0x0000FF00L) << 8) | ((a & 0x000000FFL) << 24)
-
-#define BEW16(a)     ((a & 0xFF00L) >> 8) | ((a & 0x00FFL) << 8)
+#ifndef MSB_FIRST
+#define TO_B32(a)    SWAP32(a)
+#define TO_B16(a)    SWAP16(a)
+#else
+#define TO_B32(a)    a
+#define TO_B16(a)    a
+#endif
 
 #define MIDI_TRACKS        32    /* Max tracks handled in allegro */
 #define MIDI_HDR_SIZE      14
@@ -86,15 +88,15 @@ void *read_midi(PACKFILE *f)
 
    /* Write MIDI header */
    uc = (unsigned char *)m;
-   memcpy(uc, "MThd", 4);  /* MIDI signature */
+   memcpy(uc, "MThd", 4);     /* MIDI signature */
    ui = (unsigned int *)(uc + 4);
-   *ui = BEL32(6);         /* size of header chunk */
+   *ui = TO_B32(6);           /* size of header chunk */
    us = (unsigned short *)(uc + 8);
-   *us = BEW16(1);         /* type 1 */
+   *us = TO_B16(1);           /* type 1 */
    us = (unsigned short *)(uc + 10);
-   *us = BEW16(num_tracks);/* number of tracks */
+   *us = TO_B16(num_tracks);  /* number of tracks */
    us = (unsigned short *)(uc + 12);
-   *us = BEW16(divisions); /* beat divisions */
+   *us = TO_B16(divisions);   /* beat divisions */
 
    /* Write the track data */
    uc += MIDI_HDR_SIZE;
@@ -102,9 +104,9 @@ void *read_midi(PACKFILE *f)
    {
       if (tr[c].len > 0)
       {
-         memcpy(uc, "MTrk", 4);  /* Track signature*/
+         memcpy(uc, "MTrk", 4);     /* Track signature*/
          ui = (unsigned int *)(uc + 4);
-         *ui = BEL32(tr[c].len); /* track length */
+         *ui = TO_B32(tr[c].len);   /* track length */
          uc += TRACK_HDR_SIZE;
          memcpy(uc, tr[c].data, tr[c].len);
          uc += tr[c].len;

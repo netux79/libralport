@@ -59,6 +59,15 @@ extern "C" {
 #define TSFDEF extern
 #endif
 
+// Add these defines here to enable disable Big Endian byte swaps
+#ifdef MSB_FIRST
+#define TO_L32(a)	a = SWAP32(a);
+#define TO_L16(a)	a = SWAP16(a);
+#else
+#define TO_L32(a)
+#define TO_L16(a)
+#endif
+
 // The load functions will return a pointer to a struct tsf which all functions
 // thereafter take as the first parameter.
 // On error the tsf_load* functions will return NULL most likely due to invalid
@@ -364,7 +373,16 @@ struct tsf_hydra
 	int phdrNum, pbagNum, pmodNum, pgenNum, instNum, ibagNum, imodNum, igenNum, shdrNum;
 };
 
-union tsf_hydra_genamount { struct { tsf_u8 lo, hi; } range; tsf_s16 shortAmount; tsf_u16 wordAmount; };
+union tsf_hydra_genamount 
+{ 
+#ifdef MSB_FIRST
+	struct { tsf_u8 hi, lo; } range;
+#else
+	struct { tsf_u8 lo, hi; } range;
+#endif
+	tsf_s16 shortAmount; 
+	tsf_u16 wordAmount; 
+};
 struct tsf_hydra_phdr { tsf_char20 presetName; tsf_u16 preset, bank, presetBagNdx; tsf_u32 library, genre, morphology; };
 struct tsf_hydra_pbag { tsf_u16 genNdx, modNdx; };
 struct tsf_hydra_pmod { tsf_u16 modSrcOper, modDestOper; tsf_s16 modAmount; tsf_u16 modAmtSrcOper, modTransOper; };
@@ -376,15 +394,19 @@ struct tsf_hydra_igen { tsf_u16 genOper; union tsf_hydra_genamount genAmount; };
 struct tsf_hydra_shdr { tsf_char20 sampleName; tsf_u32 start, end, startLoop, endLoop, sampleRate; tsf_u8 originalPitch; tsf_s8 pitchCorrection; tsf_u16 sampleLink, sampleType; };
 
 #define TSFR(FIELD) stream->read(stream->data, &i->FIELD, sizeof(i->FIELD));
-static void tsf_hydra_read_phdr(struct tsf_hydra_phdr* i, struct tsf_stream* stream) { TSFR(presetName) TSFR(preset) TSFR(bank) TSFR(presetBagNdx) TSFR(library) TSFR(genre) TSFR(morphology) }
-static void tsf_hydra_read_pbag(struct tsf_hydra_pbag* i, struct tsf_stream* stream) { TSFR(genNdx) TSFR(modNdx) }
-static void tsf_hydra_read_pmod(struct tsf_hydra_pmod* i, struct tsf_stream* stream) { TSFR(modSrcOper) TSFR(modDestOper) TSFR(modAmount) TSFR(modAmtSrcOper) TSFR(modTransOper) }
-static void tsf_hydra_read_pgen(struct tsf_hydra_pgen* i, struct tsf_stream* stream) { TSFR(genOper) TSFR(genAmount) }
-static void tsf_hydra_read_inst(struct tsf_hydra_inst* i, struct tsf_stream* stream) { TSFR(instName) TSFR(instBagNdx) }
-static void tsf_hydra_read_ibag(struct tsf_hydra_ibag* i, struct tsf_stream* stream) { TSFR(instGenNdx) TSFR(instModNdx) }
-static void tsf_hydra_read_imod(struct tsf_hydra_imod* i, struct tsf_stream* stream) { TSFR(modSrcOper) TSFR(modDestOper) TSFR(modAmount) TSFR(modAmtSrcOper) TSFR(modTransOper) }
-static void tsf_hydra_read_igen(struct tsf_hydra_igen* i, struct tsf_stream* stream) { TSFR(genOper) TSFR(genAmount) }
-static void tsf_hydra_read_shdr(struct tsf_hydra_shdr* i, struct tsf_stream* stream) { TSFR(sampleName) TSFR(start) TSFR(end) TSFR(startLoop) TSFR(endLoop) TSFR(sampleRate) TSFR(originalPitch) TSFR(pitchCorrection) TSFR(sampleLink) TSFR(sampleType) }
+#define TSFR32(FIELD) TSFR(FIELD) TO_L32(i->FIELD)
+#define TSFR16(FIELD) TSFR(FIELD) TO_L16(i->FIELD)
+static void tsf_hydra_read_phdr(struct tsf_hydra_phdr* i, struct tsf_stream* stream) { TSFR(presetName) TSFR16(preset) TSFR16(bank) TSFR16(presetBagNdx) TSFR32(library) TSFR32(genre) TSFR32(morphology) }
+static void tsf_hydra_read_pbag(struct tsf_hydra_pbag* i, struct tsf_stream* stream) { TSFR16(genNdx) TSFR16(modNdx) }
+static void tsf_hydra_read_pmod(struct tsf_hydra_pmod* i, struct tsf_stream* stream) { TSFR16(modSrcOper) TSFR16(modDestOper) TSFR16(modAmount) TSFR16(modAmtSrcOper) TSFR16(modTransOper) }
+static void tsf_hydra_read_pgen(struct tsf_hydra_pgen* i, struct tsf_stream* stream) { TSFR16(genOper) TSFR16(genAmount.wordAmount) }
+static void tsf_hydra_read_inst(struct tsf_hydra_inst* i, struct tsf_stream* stream) { TSFR(instName) TSFR16(instBagNdx) }
+static void tsf_hydra_read_ibag(struct tsf_hydra_ibag* i, struct tsf_stream* stream) { TSFR16(instGenNdx) TSFR16(instModNdx) }
+static void tsf_hydra_read_imod(struct tsf_hydra_imod* i, struct tsf_stream* stream) { TSFR16(modSrcOper) TSFR16(modDestOper) TSFR16(modAmount) TSFR16(modAmtSrcOper) TSFR16(modTransOper) }
+static void tsf_hydra_read_igen(struct tsf_hydra_igen* i, struct tsf_stream* stream) { TSFR16(genOper) TSFR16(genAmount.wordAmount) }
+static void tsf_hydra_read_shdr(struct tsf_hydra_shdr* i, struct tsf_stream* stream) { TSFR(sampleName) TSFR32(start) TSFR32(end) TSFR32(startLoop) TSFR32(endLoop) TSFR32(sampleRate) TSFR(originalPitch) TSFR(pitchCorrection) TSFR16(sampleLink) TSFR16(sampleType) }
+#undef TSFR16
+#undef TSFR32
 #undef TSFR
 
 struct tsf_riffchunk { tsf_fourcc id; tsf_u32 size; };
@@ -456,6 +478,7 @@ static TSF_BOOL tsf_riffchunk_read(struct tsf_riffchunk* parent, struct tsf_riff
 	if (parent && sizeof(tsf_fourcc) + sizeof(tsf_u32) > parent->size) return TSF_FALSE;
 	if (!stream->read(stream->data, &chunk->id, sizeof(tsf_fourcc)) || *chunk->id <= ' ' || *chunk->id >= 'z') return TSF_FALSE;
 	if (!stream->read(stream->data, &chunk->size, sizeof(tsf_u32))) return TSF_FALSE;
+	TO_L32(chunk->size) // For big-endian we need to swap the chunk size
 	if (parent && sizeof(tsf_fourcc) + sizeof(tsf_u32) + chunk->size > parent->size) return TSF_FALSE;
 	if (parent) parent->size -= sizeof(tsf_fourcc) + sizeof(tsf_u32) + chunk->size;
 	IsRiff = TSF_FourCCEquals(chunk->id, "RIFF"), IsList = TSF_FourCCEquals(chunk->id, "LIST");
@@ -830,14 +853,16 @@ static void tsf_load_samples(float** fontSamples, unsigned int* fontSampleCount,
 	out = *fontSamples = (float*)TSF_MALLOC(samplesLeft * sizeof(float));
 	for (; samplesLeft; samplesLeft -= samplesToRead)
 	{
-		short sampleBuffer[1024], *in = sampleBuffer;;
+		short sampleBuffer[1024], *in = sampleBuffer;
 		samplesToRead = (samplesLeft > 1024 ? 1024 : samplesLeft);
 		stream->read(stream->data, sampleBuffer, samplesToRead * sizeof(short));
 
 		// Convert from signed 16-bit to float.
 		for (samplesToConvert = samplesToRead; samplesToConvert > 0; --samplesToConvert)
-			// If we ever need to compile for big-endian platforms, we'll need to byte-swap here.
+		{
+			TO_L16(*in) //For big-endian platforms, we need to byte-swap here.
 			*out++ = (float)(*in++ / 32767.0);
+		}
 	}
 }
 
@@ -1786,6 +1811,9 @@ TSFDEF float tsf_channel_get_tuning(tsf* f, int channel)
 {
 	return (f->channels && channel < f->channels->channelNum ? f->channels->channels[channel].tuning : 0.0f);
 }
+
+#undef TO_L32
+#undef TO_L16
 
 #ifdef __cplusplus
 }
