@@ -177,6 +177,7 @@ int midi_init(int rate, float delta, const char *sf2_path)
    if (!midiSpl)
    {
       tsf_close(tinySF);
+      tinySF = NULL;
       return FALSE;
    }
 
@@ -207,9 +208,9 @@ void midi_deinit(void)
 
    destroy_sample(midiSpl);
    tsf_close(tinySF);
+   tinySF = NULL;
    if (tml)
       tml_free(tml);
-
    tmlNext = tml = NULL;
 }
 
