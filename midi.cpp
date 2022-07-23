@@ -30,13 +30,13 @@ typedef struct MIDI_TRACK
    int len;             /* length of the track data */
 } MIDI_TRACK;
 
-static SAMPLE *midiSpl; /* sample object to pass midi output to the mixer */
-static tsf *tinySF;
-static tml_message *tml = NULL; /* pointer to first midi message */
-static tml_message *tmlNext = NULL; /* next midi message to be played */
-static float mtime = -1.0f;
+static SAMPLE *_midiSpl; /* sample object to pass midi output to the mixer */
+static tsf *_tinySF;
+static tml_message *_tml = NULL; /* pointer to first midi message */
+static tml_message *_tmlNext = NULL; /* next midi message to be played */
+static float _mtime = -1.0f;
 static float _delta;
-static int mvoice = -1; /* voice index in the mixer */
+static int _mvoice = -1; /* voice index in the mixer */
 static int _rate;
 static int _sample_size;
 static int _loop = FALSE;
@@ -157,7 +157,7 @@ void destroy_midi(void *midi)
 int midi_init(int rate, float delta, const char *sf2_path)
 {
    /* Already initialized */
-   if (mvoice >= 0)
+   if (_mvoice >= 0)
       return FALSE;
 
    _rate = rate;
@@ -165,24 +165,24 @@ int midi_init(int rate, float delta, const char *sf2_path)
    _sample_size = _rate * _delta;
 
    /* Load the SoundFont from a file */
-   tinySF = tsf_load_filename(sf2_path);
-   if (!tinySF)
+   _tinySF = tsf_load_filename(sf2_path);
+   if (!_tinySF)
       return FALSE;
 
    /* Set the SoundFont rendering output mode */
-   tsf_set_output(tinySF, TSF_STEREO_INTERLEAVED, _rate, VOLUME_GAIN);
+   tsf_set_output(_tinySF, TSF_STEREO_INTERLEAVED, _rate, VOLUME_GAIN);
 
    /* Create a sample to store the output of TSF */
-   midiSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _rate, _sample_size);
-   if (!midiSpl)
+   _midiSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _rate, _sample_size);
+   if (!_midiSpl)
    {
-      tsf_close(tinySF);
-      tinySF = NULL;
+      tsf_close(_tinySF);
+      _tinySF = NULL;
       return FALSE;
    }
 
    /* Reserve voice for the midi in the mixer */
-   mvoice = allocate_voice((const SAMPLE *)midiSpl);
+   _mvoice = allocate_voice((const SAMPLE *)_midiSpl);
 
    _playing = FALSE;
 
@@ -197,21 +197,21 @@ int midi_init(int rate, float delta, const char *sf2_path)
 void midi_deinit(void)
 {
    /* not initialized? */
-   if (mvoice < 0)
+   if (_mvoice < 0)
       return;
 
    _playing = FALSE;
-   mtime = -1.0f;
+   _mtime = -1.0f;
 
-   deallocate_voice(mvoice);
-   mvoice = -1;
+   deallocate_voice(_mvoice);
+   _mvoice = -1;
 
-   destroy_sample(midiSpl);
-   tsf_close(tinySF);
-   tinySF = NULL;
-   if (tml)
-      tml_free(tml);
-   tmlNext = tml = NULL;
+   destroy_sample(_midiSpl);
+   tsf_close(_tinySF);
+   _tinySF = NULL;
+   if (_tml)
+      tml_free(_tml);
+   _tmlNext = _tml = NULL;
 }
 
 
@@ -227,30 +227,30 @@ int midi_play(void *midi, int loop)
 
    /* Has the engine been initiated and
     * the midi buffer is valid? */
-   if (mvoice < 0 || !midi)
+   if (_mvoice < 0 || !midi)
       return FALSE;
 
    /* release tml if a previous midi was on memory */
-   if (tml)
-      tml_free(tml);
+   if (_tml)
+      tml_free(_tml);
 
    /* Stop all playing notes immediatly and reset all channel 
     * parameters. Initialize preset on special 10th MIDI channel 
     * to use percussion sound bank (128) if available */
-   tsf_reset(tinySF);
-   tsf_channel_set_bank_preset(tinySF, 9, 128, 0);
+   tsf_reset(_tinySF);
+   tsf_channel_set_bank_preset(_tinySF, 9, 128, 0);
 
    /* Normally we need to pass the buffer size but in this case we 
     * cheat since we don't have this value at this point 
     * and it is not really used */
-   tml = tml_load_memory(midi, MAX_MIDI_SIZE);
-   if (!tml)
+   _tml = tml_load_memory(midi, MAX_MIDI_SIZE);
+   if (!_tml)
       return FALSE;
 
    /* Set up the midi message pointer to the first MIDI message */
-   tmlNext = tml;
+   _tmlNext = _tml;
 
-   mtime = 0.0f;
+   _mtime = 0.0f;
    _loop = loop;
    _loop_start = -1;
    _loop_end = -1;
@@ -266,13 +266,13 @@ int midi_play(void *midi, int loop)
  */
 void midi_stop(void)
 {
-   if (mtime < 0.0f)
+   if (_mtime < 0.0f)
       return;
 
-   mtime = -1.0f;
+   _mtime = -1.0f;
    _loop = FALSE;
    _playing = FALSE;
-   tmlNext = NULL;
+   _tmlNext = NULL;
 }
 
 
@@ -282,31 +282,31 @@ void midi_stop(void)
  */
 static void process_midi_msg(int apply_note)
 {
-   switch (tmlNext->type)
+   switch (_tmlNext->type)
    {
       case TML_PROGRAM_CHANGE: /* channel program (preset) change (special 
                                 * handling for 10th MIDI channel with 
                                 * drums) */
-         tsf_channel_set_presetnumber(tinySF, tmlNext->channel, 
-                                      tmlNext->program, 
-                                      (tmlNext->channel == 9));
+         tsf_channel_set_presetnumber(_tinySF, _tmlNext->channel, 
+                                      _tmlNext->program, 
+                                      (_tmlNext->channel == 9));
          break;
       case TML_NOTE_ON: /* play a note, skip on FF */
          if (apply_note)
-            tsf_channel_note_on(tinySF, tmlNext->channel, tmlNext->key, 
-                                tmlNext->velocity / 127.0f);
+            tsf_channel_note_on(_tinySF, _tmlNext->channel, _tmlNext->key, 
+                                _tmlNext->velocity / 127.0f);
          break;
       case TML_NOTE_OFF: /* stop a note, skip on FF */
          if (apply_note)
-            tsf_channel_note_off(tinySF, tmlNext->channel, tmlNext->key);
+            tsf_channel_note_off(_tinySF, _tmlNext->channel, _tmlNext->key);
          break;
       case TML_PITCH_BEND: /* pitch wheel modification */
-         tsf_channel_set_pitchwheel(tinySF, tmlNext->channel,
-                                    tmlNext->pitch_bend);
+         tsf_channel_set_pitchwheel(_tinySF, _tmlNext->channel,
+                                    _tmlNext->pitch_bend);
          break;
       case TML_CONTROL_CHANGE: /* MIDI controller messages */
-         tsf_channel_midi_control(tinySF, tmlNext->channel,
-                                  tmlNext->control, tmlNext->control_value);
+         tsf_channel_midi_control(_tinySF, _tmlNext->channel,
+                                  _tmlNext->control, _tmlNext->control_value);
          break;
    }
 }
@@ -319,13 +319,13 @@ static void process_midi_msg(int apply_note)
  */
 void midi_fastforward(int target)
 {
-   if (mtime < 0.0f)
+   if (_mtime < 0.0f)
       return;
 
    /* Loop through all MIDI messages in the list until the target 
     * beat number is reached */
-   for (; tmlNext && tmlNext->beat_no < target; tmlNext = tmlNext->next, 
-                                                mtime = tmlNext->time)
+   for (; _tmlNext && _tmlNext->beat_no < target; _tmlNext = _tmlNext->next, 
+                                                _mtime = _tmlNext->time)
       process_midi_msg(FALSE);
 }
 
@@ -347,14 +347,14 @@ static void midi_render(short *buf, int frameCount)
 
       /* Loop through all MIDI messages which need to be played up 
        * until the current playback time */
-      for (mtime += sampleBlock * (1000.0 / _rate);
-           tmlNext && mtime >= tmlNext->time;
-           tmlNext = tmlNext->next)
+      for (_mtime += sampleBlock * (1000.0 / _rate);
+           _tmlNext && _mtime >= _tmlNext->time;
+           _tmlNext = _tmlNext->next)
       {
          /* stop processing if loop end is reached */
-         if (tmlNext->beat_no == _loop_end)
+         if (_tmlNext->beat_no == _loop_end)
          {
-            tmlNext = NULL; /* set to null to mark it as finished */
+            _tmlNext = NULL; /* set to null to mark it as finished */
             break;
          }
 
@@ -362,14 +362,14 @@ static void midi_render(short *buf, int frameCount)
       }
 
       /* Render the block of audio samples in short format */
-      tsf_render_short(tinySF, buf, sampleBlock, 0);
+      tsf_render_short(_tinySF, buf, sampleBlock, 0);
    }
 }
 
 
 /* midi_fill_buffer:
  *  If a midi is set for playing, it will call the
- * midi sequencer and fill the buffer with the required
+ * midi sequencer and fill the buffer with the data
  * ready for the audio mixer. If the midi is set for
  * looping it will rewind and continue playing. Otherwise
  * it will stop playing automatically.
@@ -383,17 +383,17 @@ void midi_fill_buffer(void)
       return;
 
    /* reloop the song if needed */
-   if (!tmlNext)
+   if (!_tmlNext)
    {
       if (_loop)
       {
-         mtime = 0.0f;
-         tmlNext = tml; /* point again to the start message  */
+         _mtime = 0.0f;
+         _tmlNext = _tml; /* point again to the start message  */
 
          /* fast forward the song if loop start was set */
          if (_loop_start > 0)
          {
-            tsf_note_off_all(tinySF);
+            tsf_note_off_all(_tinySF);
             midi_fastforward(_loop_start);
          }
       }
@@ -404,7 +404,7 @@ void midi_fill_buffer(void)
       }
    }
 
-   buf = (short *)midiSpl->data;
+   buf = (short *)_midiSpl->data;
    midi_render(buf, _sample_size);
 
    /* Convert to unsigned as required by the mixer */
@@ -412,7 +412,7 @@ void midi_fill_buffer(void)
       buf[i] ^= 0x8000;
 
    /* queue the samples into the mixer */
-   voice_start(mvoice);
+   voice_start(_mvoice);
 }
 
 
@@ -427,13 +427,13 @@ void midi_pause(void)
 
 
 /* midi_resume:
- *  Resumes music from playing after being paused.
+ *  Resumes music play after being paused.
  * Does nothing if no midi has been set for playing
  * using play_midi().
  */
 void midi_resume(void)
 {
-   if (mtime >= 0.0f)
+   if (_mtime >= 0.0f)
       _playing = TRUE;
 }
 
@@ -445,7 +445,7 @@ void midi_resume(void)
  */
 void midi_loopstart(int value)
 {
-   if (mtime >= 0.0f)
+   if (_mtime >= 0.0f)
       _loop_start = value;
 }
 
@@ -457,7 +457,7 @@ void midi_loopstart(int value)
  */
 void midi_loopend(int value)
 {
-   if (mtime >= 0.0f)
+   if (_mtime >= 0.0f)
       _loop_end = value;
 }
 
@@ -468,7 +468,7 @@ void midi_loopend(int value)
  */
 int midi_isplaying(void)
 {
-   return (mtime >= 0.0f);
+   return (_mtime >= 0.0f);
 }
 
 
@@ -478,21 +478,21 @@ int midi_isplaying(void)
 int midi_get_volume(void)
 {
    /* not initialized? */
-   if (mvoice < 0)
+   if (_mvoice < 0)
       return 0;
 
-   return voice_get_volume(mvoice);
+   return voice_get_volume(_mvoice);
 }
 
-/* midi_get_volume:
+/* midi_set_volume:
  *  Returns the actual music volume used for midi output.
  */
 void midi_set_volume(int volume)
 {
    /* not initialized? */
-   if (mvoice < 0)
+   if (_mvoice < 0)
       return;
 
    volume = CLAMP(0, volume, 255);
-   voice_set_volume(mvoice, volume);
+   voice_set_volume(_mvoice, volume);
 }
