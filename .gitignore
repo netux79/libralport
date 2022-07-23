@@ -33,6 +33,7 @@
 
 #Folders
 test
+.vscode
 
 #other
 output

@@ -14,6 +14,7 @@
 #include "palette.h"
 #include "sound.h"
 #include "midi.h"
+#include "gme.h"
 #include "fix.h"
 
 #ifndef TRUE
