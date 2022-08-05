@@ -218,6 +218,8 @@ int mixer_init(int bufsize, int freq, int quality, int voices)
 
    mix_freq = freq;
    mix_size = bufsize;
+   if (mix_freq <=0 || mix_size <= 0)
+      return FALSE;
 
    for (i = 0; i < MIXER_MAX_SFX; i++)
    {
@@ -1162,9 +1164,7 @@ void voice_start(int voice)
 {
    if (mixer_voice[voice].sample)
    {
-      if (mixer_voice[voice].pos >= mixer_voice[voice].len)
-         mixer_voice[voice].pos = 0;
-
+      mixer_voice[voice].pos = 0;
       mixer_voice[voice].playing = TRUE;
    }
 }

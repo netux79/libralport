@@ -57,4 +57,4 @@ void voice_stop(int voice);
 }
 #endif
 
-#endif          /* ifndef ALPORT_PALETTE_H */
+#endif          /* ifndef ALPORT_SOUND_H */
