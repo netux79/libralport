@@ -10,19 +10,18 @@
 
 static Music_Emu *_gme = NULL;
 static SAMPLE *_gmeSpl = NULL; /* sample object to pass gme output to the mixer */
-static float _delta;
-static int _rate;
+static float _delta = -1.0;
 static int _mvoice = -1; /* voice index in the mixer */
-static int _sample_size;
+static int _render_size; /* audio frame count to render at a time */
 static int _playing = FALSE;
 
 
-/* load_gme:
+/* gme_load:
  *  Load GME file from path location using Allegro's packfile 
  * routines. It returns a pointer to a GME object 
  * that can be used by the GME playing routines.
  */
-GME *load_gme(const char* filename)
+GME *gme_load(const char* filename)
 {
    PACKFILE *f = NULL;
    long size = 0;
@@ -56,7 +55,7 @@ GME *load_gme(const char* filename)
       type = GME_TYPE::GME_SPC;
 
    /* Load it from buffer and the proper music emulator */
-   gme = (Music_Emu*)read_gme(buf, size, type);
+   gme = (Music_Emu*)gme_create(buf, size, type);
 
 _RETURN:
    if(buf) free(buf);
@@ -66,13 +65,14 @@ _RETURN:
 }
 
 
-/* read_gme:
+/* gme_create:
  *  Reads GME data from a buffer, it creates the Music_Emu
  * emulator based on the passed GME_TYPE type.
  * Return NULL if any error is encountered.
  */
-GME *read_gme(void* buf, size_t size, GME_TYPE type)
+GME *gme_create(void* buf, size_t size, GME_TYPE type)
 {
+   int _rate;
    Music_Emu *gme = NULL;
    Mem_File_Reader reader(buf, size);
 
@@ -84,7 +84,14 @@ GME *read_gme(void* buf, size_t size, GME_TYPE type)
       gme = new Spc_Emu;
    else
       return NULL;
-   
+
+   /* Use the mixer sample rate to generate the GME output 
+    * except for the SNES which native output is 32000 */
+   _rate = (type == GME_TYPE::GME_SPC) ? 32000 : mixer_get_frequency();
+   if (_rate <= 0)
+      return NULL;
+
+   /* Set the rate at which to play the GME */
    if (gme->set_sample_rate(_rate))
       return NULL;
 
@@ -95,10 +102,10 @@ GME *read_gme(void* buf, size_t size, GME_TYPE type)
 }
 
 
-/* destroy_gme:
+/* gme_destroy:
  *  Frees the memory being used by a GME emulator object.
  */
-void destroy_gme(GME *gme)
+void gme_destroy(GME *gme)
 {
    if (gme)
       delete (Music_Emu*)gme;
@@ -107,27 +114,15 @@ void destroy_gme(GME *gme)
 
 /* gme_init:
  *  Setup the GME engine to be used together with the mixer.
- * rate:  Frequency of the output to generate, i.e. 44000
  * delta: Ratio at which a sound slice will be queried i.e. 1/60
  */
-int gme_init(int rate, float delta)
+int gme_init(float delta)
 {
    /* Already initialized */
-   if (_mvoice >= 0)
+   if (_delta > 0.0)
       return FALSE;
 
-   _rate = rate;
    _delta = delta;
-   _sample_size = _rate * _delta;
-
-   /* Create a sample to store the output of GME */
-   _gmeSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _rate, _sample_size);
-   if (!_gmeSpl)
-      return FALSE;
-
-   /* Reserve voice for the GME in the mixer */
-   _mvoice = allocate_voice((const SAMPLE *)_gmeSpl);
-
    _gme = NULL;
    _playing = FALSE;
 
@@ -141,16 +136,12 @@ int gme_init(int rate, float delta)
 void gme_deinit(void)
 {
    /* not initialized? */
-   if (_mvoice < 0)
+   if (_delta <= 0.0)
       return;
 
+   _delta = -1.0;
    _playing = FALSE;
    _gme = NULL;
-
-   deallocate_voice(_mvoice);
-   _mvoice = -1;
-
-   destroy_sample(_gmeSpl);
 }
 
 
@@ -162,15 +153,28 @@ void gme_deinit(void)
  */
 int gme_play(GME *gme)
 {
-   /* Has the engine been initiated and
-    * the GME object is valid? */
-   if (_mvoice < 0 || !gme)
+   /* Has the engine and the GME object is valid? */
+   if (_delta < 0.0 || !gme)
       return FALSE;
+
+   /* if already playing something, stop it */
+   if (_gme)
+      gme_stop();
 
    /* Sets the GME object to be played */
    _gme = (Music_Emu*)gme;
 
-   /* Reset GME object to its start status */
+   _render_size = _delta * _gme->sample_rate();
+
+   /* Create a sample to store the output of GME */
+   _gmeSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _gme->sample_rate(), _render_size);
+   if (!_gmeSpl)
+      return FALSE;
+
+   /* Reserve voice for the GME in the mixer */
+   _mvoice = allocate_voice((const SAMPLE *)_gmeSpl);
+
+   /* Reset GME object to its start position on first track */
    _gme->start_track(0);
 
    _playing = TRUE;
@@ -180,12 +184,20 @@ int gme_play(GME *gme)
 
 
 /* gme_stop:
- *  Stop GME from being played and reset playing
+ *  Stops GME from being played and reset playing
  * control variables. To play again the same or another
  * GME, a call to gme_play() is needed after calling this.
  */
 void gme_stop(void)
 {
+   /* Do not continue if not playing */
+   if (!_gme)
+      return;
+
+   deallocate_voice(_mvoice);
+   _mvoice = -1;
+   destroy_sample(_gmeSpl);
+
    _gme = NULL;
    _playing = FALSE;
 }
@@ -205,10 +217,10 @@ void gme_fill_buffer(void)
       return;
 
    buf = (short *)_gmeSpl->data;
-   _gme->play(_sample_size * AUDIO_CHANNELS, buf);
+   _gme->play(_render_size * AUDIO_CHANNELS, buf);
 
    /* Convert to unsigned as required by the mixer */
-   for (i = 0; i < _sample_size * AUDIO_CHANNELS; i++)
+   for (i = 0; i < _render_size * AUDIO_CHANNELS; i++)
       buf[i] ^= 0x8000;
 
    /* queue the samples into the mixer */
@@ -253,7 +265,7 @@ int gme_isplaying(void)
  */
 int gme_get_volume(void)
 {
-   /* not initialized? */
+   /* not playing? */
    if (_mvoice < 0)
       return 0;
 
@@ -266,7 +278,7 @@ int gme_get_volume(void)
  */
 void gme_set_volume(int volume)
 {
-   /* not initialized? */
+   /* not playing? */
    if (_mvoice < 0)
       return;
 

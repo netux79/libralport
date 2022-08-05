@@ -15,6 +15,8 @@
 #include "sound.h"
 #include "midi.h"
 #include "gme.h"
+#include "mp3.h"
+#include "vorbis.h"
 #include "fix.h"
 
 #ifndef TRUE

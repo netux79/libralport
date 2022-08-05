@@ -8,7 +8,8 @@ prefix=/usr/local
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra -pedantic -fPIC -std=gnu++11 -O3 $(INCPATH)
+CFLAGS=-Wall -Wextra -pedantic -fPIC -std=gnu99 -O3
+CXXFLAGS=-Wall -Wextra -pedantic -fPIC -std=gnu++11 -O3
 LDFLAGS=
 
 RANLIB=ranlib
@@ -25,6 +26,8 @@ OBJS = lzss.o \
 	file.o \
 	fix.o \
 	gme.o \
+	mp3.o \
+	vorbis.o \
 	gme/abstract_file.o \
 	gme/Blip_Buffer.o \
 	gme/Classic_Emu.o \
@@ -59,4 +62,7 @@ clean:
 	rm -f libalport.a
 
 %.o : %.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c $< -o $@
