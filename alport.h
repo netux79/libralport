@@ -14,6 +14,7 @@
 #include "palette.h"
 #include "sound.h"
 #include "midi.h"
+#include "stream.h"
 #include "gme.h"
 #include "mp3.h"
 #include "vorbis.h"

@@ -1,19 +1,19 @@
-#include <string.h>
 #include <stdlib.h>
 #include "alport.h"
 #include "gme/Gbs_Emu.h"
 #include "gme/Nsf_Emu.h"
 #include "gme/Spc_Emu.h"
 
-#define SAMPLE_BIT_DEPTH   16
-#define AUDIO_CHANNELS     2
+#define GME_BIT_DEPTH   16
+#define GME_CHANNELS     2
 
-static Music_Emu *_gme = NULL;
-static SAMPLE *_gmeSpl = NULL; /* sample object to pass gme output to the mixer */
-static float _delta = -1.0;
-static int _mvoice = -1; /* voice index in the mixer */
-static int _render_size; /* audio frame count to render at a time */
-static int _playing = FALSE;
+extern void *stream;
+extern unsigned char stream_type;
+extern SAMPLE *stream_sample;
+extern float stream_delta;
+extern int stream_voice;
+extern int stream_playing;
+extern int (*stream_audio_render)(short *buf, unsigned int render_size);
 
 
 /* gme_load:
@@ -112,178 +112,63 @@ void gme_destroy(GME *gme)
 }
 
 
-/* gme_init:
- *  Setup the GME engine to be used together with the mixer.
- * delta: Ratio at which a sound slice will be queried i.e. 1/60
+/* gme_audio_render:
+ *  If a GME is set for playing, it will call this function
+ * to fill the buffer with the required data slice
+ * ready for the audio mixer. The audio will always loop for GME.
+ * Returns FALSE if nothing was rendered.
  */
-int gme_init(float delta)
+int gme_audio_render(short *buf, unsigned int render_size)
 {
-   /* Already initialized */
-   if (_delta > 0.0)
-      return FALSE;
+   Music_Emu *gme = (Music_Emu *)stream;
 
-   _delta = delta;
-   _gme = NULL;
-   _playing = FALSE;
+   gme->play(render_size * GME_CHANNELS, buf);
 
    return TRUE;
 }
 
 
-/* gme_deinit:
- *  Stop GME and frees any resource being used by the engine.
- */
-void gme_deinit(void)
-{
-   /* not initialized? */
-   if (_delta <= 0.0)
-      return;
-
-   _delta = -1.0;
-   _playing = FALSE;
-   _gme = NULL;
-}
-
-
-/* gme_play:
+/* stream_play_gme:
  *  Sets a GME object to the engine to start playing it.
  * if the GME engine is not initiated yet or the GME object is
  * null it does nothing. Returns TRUE if successful or
  * zero (FALSE) otherwise.
  */
-int gme_play(GME *gme)
+int stream_play_gme(GME *gme)
 {
+   Music_Emu* _gme = (Music_Emu*)gme;
+
    /* Has the engine and the GME object is valid? */
-   if (_delta < 0.0 || !gme)
+   if (stream_delta < 0.0 || !_gme)
       return FALSE;
 
    /* if already playing something, stop it */
-   if (_gme)
-      gme_stop();
+   if (stream)
+      stream_stop();
 
-   /* Sets the GME object to be played */
-   _gme = (Music_Emu*)gme;
-
-   _render_size = _delta * _gme->sample_rate();
-
-   /* Create a sample to store the output of GME */
-   _gmeSpl = create_sample(SAMPLE_BIT_DEPTH, TRUE, _gme->sample_rate(), _render_size);
-   if (!_gmeSpl)
+   /* Create the sample to store the output of GME */
+   stream_sample = create_sample(GME_BIT_DEPTH, (GME_CHANNELS > 1 ? TRUE : FALSE), _gme->sample_rate(), stream_delta * _gme->sample_rate());
+   if (!stream_sample)
       return FALSE;
 
    /* Reserve voice for the GME in the mixer */
-   _mvoice = allocate_voice((const SAMPLE *)_gmeSpl);
+   stream_voice = allocate_voice((const SAMPLE *)stream_sample);
+   if (stream_voice == -1)
+   {
+      destroy_sample(stream_sample);
+      return FALSE;
+   }
 
    /* Reset GME object to its start position on first track */
    _gme->start_track(0);
 
-   _playing = TRUE;
+   /* Sets it as the STREAM to be played */
+   stream = _gme;
+   stream_type = STREAM_GME;
+   stream_audio_render = gme_audio_render;
+   stream_playing = TRUE;
 
    return TRUE;
-}
-
-
-/* gme_stop:
- *  Stops GME from being played and reset playing
- * control variables. To play again the same or another
- * GME, a call to gme_play() is needed after calling this.
- */
-void gme_stop(void)
-{
-   /* Do not continue if not playing */
-   if (!_gme)
-      return;
-
-   deallocate_voice(_mvoice);
-   _mvoice = -1;
-   destroy_sample(_gmeSpl);
-
-   _gme = NULL;
-   _playing = FALSE;
-}
-
-
-/* gme_fill_buffer:
- *  If a GME is set for playing, it will call the
- * GME engine to fill the buffer with the required data slice
- * ready for the audio mixer. The audio will always loop.
- */
-void gme_fill_buffer(void)
-{
-   int i;
-   short *buf;
-
-   if (!_playing)
-      return;
-
-   buf = (short *)_gmeSpl->data;
-   _gme->play(_render_size * AUDIO_CHANNELS, buf);
-
-   /* Convert to unsigned as required by the mixer */
-   for (i = 0; i < _render_size * AUDIO_CHANNELS; i++)
-      buf[i] ^= 0x8000;
-
-   /* queue the samples into the mixer */
-   voice_start(_mvoice);
-}
-
-
-/* gme_pause:
- *  Pauses GME audio from playing for later resuming.
- * If already paused it does nothing.
- */
-void gme_pause(void)
-{
-   _playing = FALSE;
-}
-
-
-/* gme_resume:
- *  Resumes GME playing after being paused.
- * Does nothing if no GME has been set for playing
- * using play_gme().
- */
-void gme_resume(void)
-{
-   if (_gme)
-      _playing = TRUE;
-}
-
-
-/* gme_isplaying:
- *  Returns TRUE if a GME is set for playing (even if
- * it has been paused), FALSE otherwise.
- */
-int gme_isplaying(void)
-{
-   return (_gme != NULL);
-}
-
-
-/* gme_get_volume:
- *  Returns the actual volume used for GME audio output.
- */
-int gme_get_volume(void)
-{
-   /* not playing? */
-   if (_mvoice < 0)
-      return 0;
-
-   return voice_get_volume(_mvoice);
-}
-
-
-/* gme_set_volume:
- *  Sets the actual volume to use for GME audio output.
- */
-void gme_set_volume(int volume)
-{
-   /* not playing? */
-   if (_mvoice < 0)
-      return;
-
-   volume = CLAMP(0, volume, 255);
-   voice_set_volume(_mvoice, volume);
 }
 
 
@@ -310,12 +195,43 @@ int gme_track_count(GME *gme)
 void gme_change_track(int track)
 {
    int tracks;
+   Music_Emu* gme = (Music_Emu*)stream;
    
-   if (!_gme)
+   if (!gme)
+      return;
+
+   if (stream_type != STREAM_GME)
       return;
    
-   tracks = _gme->track_count();
+   tracks = gme->track_count();
    track = CLAMP(0, track, tracks);
 
-   _gme->start_track(track);
+   gme->start_track(track);
+}
+
+
+/* gme_get_samplerate:
+ *  Returns HZ at which was the GME encoded on
+ * the passed GME object. -1 if the passed object is
+ * invalid.
+ */
+int gme_get_samplerate(GME *gme)
+{
+   if (!gme)
+      return -1;
+
+   return ((Music_Emu *)gme)->sample_rate();
+}
+
+
+/* gme_get_channels:
+ *  Returns 2 since all the GME are generated with 2 channels.
+ * or -1 if the GME param is invalid.
+ */
+int gme_get_channels(GME *gme)
+{
+   if (!gme)
+      return -1;
+
+   return GME_CHANNELS;
 }

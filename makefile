@@ -25,6 +25,7 @@ OBJS = lzss.o \
 	midi.o \
 	file.o \
 	fix.o \
+	stream.o \
 	gme.o \
 	mp3.o \
 	vorbis.o \
