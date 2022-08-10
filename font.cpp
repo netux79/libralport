@@ -11,7 +11,7 @@
 
 
 /*  read_font:
- *  Only allegro mono fonts 8-pixel-width (max) are compatible.
+ *  Only allegro mono fonts are compatible on this port.
  */
 static FONT *read_font(PACKFILE *pack)
 {
@@ -54,23 +54,25 @@ static FONT *read_font(PACKFILE *pack)
    {
       gl[i].width = pack_mgetw(pack);
       gl[i].height = pack_mgetw(pack);
-      gl[i].row = (unsigned char *)malloc(gl[i].height);
-
-      /* Only accept 8 pixel width (max) */
-      if (gl[i].width > 8 || !gl[i].row)
+      /* calculate glyph size */
+      temp = ((gl[i].width + 7) / 8) * gl[i].height;
+      
+      gl[i].data = (unsigned char *)malloc(temp);
+      if (!gl[i].data)
       {
          while (i >= 0)
          {
-            if (gl[i].row)
-               free(gl[i].row);
+            if (gl[i].data)
+               free(gl[i].data);
             i--;
          }
          free(gl);
          free(f);
          return NULL;
       }
+
       /* Read actual glyph data */
-      pack_fread(gl[i].row, gl[i].height, pack);
+      pack_fread(gl[i].data, temp, pack);
 
       /* Update font height */
       if (gl[i].height > f->height)
@@ -87,7 +89,7 @@ void destroy_font(FONT *f)
 {
    int i;
    for (i = 0; i < f->total_glyphs; i++)
-      free(f->glyph[i].row);
+      free(f->glyph[i].data);
    free(f->glyph);
    free(f);
 }
@@ -161,7 +163,7 @@ static int _render_char(const FONT *f, int ch, int fg, int bg, BITMAP *bmp,
    g = _find_glyph(f, ch);
    if (g)
    {
-      const unsigned char *data = g->row;
+      const unsigned char *data = g->data;
       unsigned char *addr;
       int w = g->width;
       int h = g->height;

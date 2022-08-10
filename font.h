@@ -7,7 +7,7 @@ extern "C" {
 
 typedef struct FONT_GLYPH           /* a single monochrome font character */
 {
-   unsigned char *row;
+   unsigned char *data;
    int width;
    int height;
 } FONT_GLYPH;
