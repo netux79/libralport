@@ -20,6 +20,10 @@ OBJS = lzss.o \
 	font.o \
 	bitmap.o \
 	primitive.o \
+	primitive2.o \
+	polygon.o \
+	3d.o \
+	rotate.o \
 	palette.o \
 	sound.o \
 	midi.o \

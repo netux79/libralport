@@ -1,10 +1,11 @@
 #ifndef ALPORT_VORBIS_H
 #define ALPORT_VORBIS_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 typedef void VORBIS;
 

@@ -44,6 +44,7 @@ static int _loop_start = -1;
 static int _loop_end = -1;
 static int _playing = FALSE;
 
+
 /* read_midi:
  *  Reads MIDI data from a packfile (in allegro MIDI format and
  * transform it to standard format to allow TSF engine processing).

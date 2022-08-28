@@ -1,10 +1,11 @@
 #ifndef ALPORT_MP3_H
 #define ALPORT_MP3_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 typedef void MP3;
 

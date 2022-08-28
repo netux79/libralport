@@ -1143,7 +1143,6 @@ int voice_get_pan(int voice)
 }
 
 
-
 /* voice_set_pan:
  *  Sets the pan position of a voice.
  */
@@ -1178,4 +1177,3 @@ void voice_stop(int voice)
    if (mixer_voice[voice].sample)
       mixer_voice[voice].playing = FALSE;
 }
-

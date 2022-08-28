@@ -32,6 +32,7 @@ DATAFILE_TYPE _datafile_type[MAX_DATAFILE_TYPES] =
 
 static void (*datafile_callback)(DATAFILE *) = NULL;
 
+
 /* register_datafile_object:
  *  Registers a custom datafile object, providing functions for loading
  *  and destroying the objects.

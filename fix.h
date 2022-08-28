@@ -1,9 +1,9 @@
 #ifndef ALPORT_FIX_H
 #define ALPORT_FIX_H
 
-#ifdef __cplusplus
+#include "base.h"
 
-typedef int32_t fixed;
+#ifdef __cplusplus
 
 class fix      /* C++ wrapper for the fixed point routines */
 {
@@ -182,6 +182,16 @@ inline int fixfloor(fixed x)
       return (x >> 16);
    else
       return ~((~x) >> 16);
+}
+
+inline int fixceil(fixed x)
+{
+   if (x > 0x7FFF0000)
+   {
+      return 0x7FFF;
+   }
+
+   return fixfloor(x + 0xFFFF);
 }
 
 inline fixed ftofix(double x)

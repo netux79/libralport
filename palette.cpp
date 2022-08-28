@@ -378,3 +378,16 @@ void *load_dat_palette(PACKFILE *f, long size)
    return p;
 }
 
+
+/* makecol:
+ *  Converts R, G, and B values (ranging 0-255) to an 8 bit paletted color.
+ *  If the global rgb_map table is initialised, it uses that, otherwise
+ *  it returns 0.
+ */
+int makecol(int r, int g, int b)
+{
+   if (rgb_map)
+      return rgb_map->data[r >> 3][g >> 3][b >> 3];
+
+   return 0;
+}

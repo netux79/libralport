@@ -85,6 +85,9 @@ static FONT *read_font(PACKFILE *pack)
 }
 
 
+/* destroy_font:
+ *  Freeds up all the memory used by the font.
+ */
 void destroy_font(FONT *f)
 {
    int i;
@@ -95,6 +98,9 @@ void destroy_font(FONT *f)
 }
 
 
+/* load_dat_font:
+ *  Returns a FONT loaded from a DATAFILE.
+ */
 void *load_dat_font(PACKFILE *f, long size)
 {
    (void)size;
@@ -312,6 +318,20 @@ void textout_centre_ex(BITMAP *bmp, const FONT *f, const char *str, int x,
 
    len = text_length(f, str);
    textout_ex(bmp, f, str, x - len / 2, y, fg, bg);
+}
+
+
+/* textout_right_ex:
+ *  Like textout_ex(), but uses the x coordinate as the right rather than 
+ *  the left of the string.
+ */
+void textout_right_ex(BITMAP *bmp, const FONT *f, const char *str, int x, int y,
+                      int fg, int bg)
+{
+   int len;
+
+   len = text_length(f, str);
+   textout_ex(bmp, f, str, x - len, y, fg, bg);
 }
 
 

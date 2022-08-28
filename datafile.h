@@ -1,6 +1,8 @@
 #ifndef ALPORT_DATAFILE_H
 #define ALPORT_DATAFILE_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,13 +31,11 @@ typedef struct DATAFILE_TYPE
    void (*destroy)(void *);
 } DATAFILE_TYPE;
 
-
 typedef struct DATAFILE_PROPERTY
 {
    char *dat;                          /* pointer to the data */
    int type;                           /* property type */
 } DATAFILE_PROPERTY;
-
 
 typedef struct DATAFILE
 {
@@ -44,7 +44,6 @@ typedef struct DATAFILE
    long size;                          /* size of the object */
    DATAFILE_PROPERTY *prop;            /* object properties */
 } DATAFILE;
-
 
 typedef struct DATAFILE_INDEX
 {
@@ -72,7 +71,6 @@ DATAFILE *find_datafile_object(const DATAFILE *dat, const char *objectname);
 const char *get_datafile_property(const DATAFILE *dat, int type);
 void register_datafile_object(int id, void *(*load)(PACKFILE *f, long size),
                               void (*destroy)(void *data));
-
 
 #ifdef __cplusplus
 }

@@ -1,10 +1,11 @@
 #ifndef ALPORT_SOUND_H
 #define ALPORT_SOUND_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 typedef struct SAMPLE
 {

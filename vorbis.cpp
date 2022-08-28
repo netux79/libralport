@@ -17,7 +17,6 @@ extern int (*stream_audio_render)(short *buf, unsigned int render_size);
 static int _loop = FALSE;
 
 
-
 /* vorbis_load:
  *  Load VORBIS file from path location using Allegro's packfile
  * routines. It returns a pointer to a VORBIS object

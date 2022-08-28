@@ -2,9 +2,11 @@
 #include <string.h>
 #include "alport.h"
 
-#define MASKED_COLOR    0
 
-/* Only supporting 8-bit bitmaps */
+/* create_bitmap:
+ *  Creates a new memory bitmap.
+ *  Only supporting 8-bit bitmaps.
+ */
 BITMAP *create_bitmap(int width, int height)
 {
    BITMAP *bitmap;
@@ -42,6 +44,11 @@ BITMAP *create_bitmap(int width, int height)
 }
 
 
+/* create_sub_bitmap:
+ *  Creates a sub bitmap, ie. a bitmap sharing drawing memory with a
+ *  pre-existing bitmap, but possibly with different clipping settings.
+ *  Usually will be smaller, and positioned at some arbitrary point.
+ */
 BITMAP *create_sub_bitmap(BITMAP *parent, int x, int y, int width, int height)
 {
    BITMAP *bitmap;
@@ -80,6 +87,9 @@ BITMAP *create_sub_bitmap(BITMAP *parent, int x, int y, int width, int height)
 }
 
 
+/* destroy_bitmap:
+ *  Destroys a memory bitmap.
+ */
 void destroy_bitmap(BITMAP *bitmap)
 {
    if (bitmap)
@@ -95,6 +105,9 @@ void destroy_bitmap(BITMAP *bitmap)
 }
 
 
+/* clear_to_color:
+ *  Clears the bitmap to designated color.
+ */
 void clear_to_color(BITMAP *bitmap, int color)
 {
    int i;
@@ -117,12 +130,23 @@ void clear_to_color(BITMAP *bitmap, int color)
 }
 
 
+/* clear_bitmap:
+ *  Clears the bitmap to color 0.
+ */
 void clear_bitmap(BITMAP *bitmap)
 {
    clear_to_color(bitmap, 0);
 }
 
 
+/* blit:
+ *  Copies an area of the source bitmap to the destination bitmap. s_x and 
+ *  s_y give the top left corner of the area of the source bitmap to copy, 
+ *  and d_x and d_y give the position in the destination bitmap. w and h 
+ *  give the size of the area to blit. This routine respects the clipping 
+ *  rectangle of the destination bitmap, and will work correctly even when 
+ *  the two memory areas overlap (ie. src and dest are the same). 
+ */
 void blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy, int w,
           int h)
 {
@@ -162,12 +186,19 @@ void masked_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy,
 }
 
 
+/* draw_sprite:
+ *  Draws a sprite onto a linear bitmap at the specified x, y position,
+ *  using a masked drawing mode where zero pixels are not output.
+ */
 void draw_sprite(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
 {
    masked_blit(sprite, bmp, 0, 0, dx, dy, sprite->w, sprite->h);
 }
 
 
+/* draw_sprite_v_flip:
+ *  Draws a sprite to a linear bitmap, flipping vertically.
+ */
 void draw_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
 {
    int x, y;
@@ -184,6 +215,29 @@ void draw_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
 
          if (c != MASKED_COLOR)
             *d = c;
+      }
+   }
+}
+
+
+/* draw_trans_sprite:
+ *  Draws a translucent sprite onto a linear bitmap.
+ * This requires the colormap var being valid.
+ */
+void draw_trans_sprite(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
+{
+   int x, y;
+
+   for (y = 0; y < sprite->h; y++)
+   {
+      unsigned char *s = sprite->line[y];
+      unsigned char *d = bmp->line[y + dy] + dx;
+
+      for (x = 0; x < sprite->w; s++, d++, x++)
+      {
+         /* get color translation from color_map */
+         unsigned char c = color_map->data[*d][*s];
+         *d = c;
       }
    }
 }
@@ -236,6 +290,10 @@ static void stretch_line(unsigned char *dptr, unsigned char *sptr)
    }
 }
 
+
+/* stretch_blit:
+ *  Opaque bitmap scaling function.
+ */
 void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
                   int dx, int dy, int dw, int dh)
 {

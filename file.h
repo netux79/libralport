@@ -1,6 +1,8 @@
 #ifndef ALPORT_FILE_H
 #define ALPORT_FILE_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,6 +1,8 @@
 #ifndef ALPORT_LZSS_H
 #define ALPORT_LZSS_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

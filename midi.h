@@ -1,10 +1,11 @@
 #ifndef ALPORT_MIDI_H
 #define ALPORT_MIDI_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 void destroy_midi(void *midi);
 void *load_midi_object(PACKFILE *f, long size);

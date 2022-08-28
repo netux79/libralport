@@ -1,6 +1,8 @@
 #ifndef ALPORT_FONT_H
 #define ALPORT_FONT_H
 
+#include "base.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,6 +34,8 @@ void textout_ex(BITMAP *bmp, const FONT *f, const char *str, int x, int y,
                 int fg, int bg);
 void textout_centre_ex(BITMAP *bmp, const FONT *f, const char *str, int x,
                        int y, int fg, int bg);
+void textout_right_ex(BITMAP *bmp, const FONT *f, const char *str, int x, int y,
+                      int fg, int bg);                       
 void textprintf_ex(BITMAP *bmp, const FONT *f, int x, int y, int fg, int bg,
                    const char *format, ...);
 

@@ -2,7 +2,14 @@
 #include "alport.h"
 
 
-void putpixel(BITMAP *bmp, int x, int y, int color)
+/* info about the current graphics drawing mode */
+int _drawing_mode = DRAW_MODE_SOLID;
+
+
+/* putpixel_solid:
+ *  Draws a solid pixel onto a linear bitmap.
+ */
+static void putpixel_solid(BITMAP *bmp, int x, int y, int color)
 {
    if(bmp->clip) 
    {
@@ -19,7 +26,11 @@ void putpixel(BITMAP *bmp, int x, int y, int color)
    *(bmp->line[y] + x) = color;
 }
 
-void hline(BITMAP *bmp, int x1, int y, int x2, int color)
+
+/* hline_solid:
+ *  Draws a horizontal line onto a linear bitmap.
+ */
+static void hline_solid(BITMAP *bmp, int x1, int y, int x2, int color)
 {
    if (bmp->clip)
    {
@@ -37,13 +48,135 @@ void hline(BITMAP *bmp, int x1, int y, int x2, int color)
    memset(d, color, x2 - x1 + 1);
 }
 
-/* Warning: No bound check is performed */
-void vline(BITMAP *bmp, int x, int y1, int y2, int color)
+
+/* vline_solid:
+ *  Draws a vertical line onto a linear bitmap.
+ * Warning: No bound check is performed */
+static void vline_solid(BITMAP *bmp, int x, int y1, int y2, int color)
 {
    int y;
    for (y = y1; y <= y2; y++)
       *(bmp->line[y] + x) = color;
 }
+
+
+/* putpixel_trans:
+ *  Draws a transparent pixel onto a linear bitmap using a previously
+ * created COLORMAP.
+ */
+static void putpixel_trans(BITMAP *bmp, int x, int y, int color)
+{
+   if(bmp->clip) 
+   {
+      if (y < bmp->ct)
+         return;
+      if (y >= bmp->cb)
+         return;
+      if (x < bmp->cl)
+         return;
+      if (x >= bmp->cr)
+         return;
+   }
+
+   /* Calculate pixel offset */
+   unsigned char *p = bmp->line[y] + x;
+   /* Get source color */
+   int sc = *p;
+   /* Replace the color with the mapped color */
+   *p = color_map->data[color][sc];
+}
+
+
+/* hline_trans:
+ *  Draws a horizontal line onto a linear bitmapusing a previously
+ * created COLORMAP.
+ */
+static void hline_trans(BITMAP *bmp, int x1, int y, int x2, int color)
+{
+   if (bmp->clip)
+   {
+     if (x1 < bmp->cl)
+         x1 = bmp->cl;
+
+      if (x2 >= bmp->cr)
+         x2 = bmp->cr - 1;
+
+      if (y < bmp->ct || y >= bmp->cb)
+         return;
+   }
+
+   int sc;
+   unsigned char *p = bmp->line[y] + x1;
+   unsigned char *pe = bmp->line[y] + x2;
+   while (p <= pe)
+   {
+      sc = *p;
+      *p = color_map->data[color][sc];
+      p++;
+   }
+}
+
+
+/* vline_trans:
+ *  Draws a vertical line onto a linear bitmap.
+ * Warning: No bound check is performed */
+static void vline_trans(BITMAP *bmp, int x, int y1, int y2, int color)
+{
+   int y, sc;
+   unsigned char *p;
+   for (y = y1; y <= y2; y++)
+   {
+      p = bmp->line[y] + x;
+      sc = *p;
+      *p = color_map->data[color][sc];
+   }
+}
+
+
+/* putpixel, hline, vline:
+ *  Hook functions of the basic drawing to define their
+ * current functionality by using drawing_mode().
+ */
+void (*putpixel)(BITMAP *bmp, int x, int y, int color) = putpixel_solid;
+void (*hline)(BITMAP *bmp, int x1, int y, int x2, int color) = hline_solid;
+void (*vline)(BITMAP *bmp, int x, int y1, int y2, int color) = vline_solid;
+
+
+/* drawing_mode:
+ *  Sets the drawing mode. This only affects routines like putpixel,
+ *  lines, rectangles, triangles, etc, not the blitting or sprite
+ *  drawing functions.
+ */
+void drawing_mode(int mode)
+{
+   if (mode == DRAW_MODE_TRANS && color_map)
+   {
+      putpixel = putpixel_trans;
+      hline = hline_trans;
+      vline = vline_trans;
+      _drawing_mode = DRAW_MODE_TRANS;
+   }
+   else
+   {
+      putpixel = putpixel_solid;
+      hline = hline_solid;
+      vline = vline_solid;
+      _drawing_mode = DRAW_MODE_SOLID;
+   }
+}
+
+
+/* getpixel:
+ *  Reads a pixel from a linear bitmap.
+ */
+int getpixel(BITMAP *bmp, int x, int y)
+{
+   if ((x < 0) || (x >= bmp->w) || (y < 0) || (y >= bmp->h))
+      return -1;
+
+   return *(bmp->line[y] + x);
+}
+
 
 /* do_line:
  *  Calculates all the points along a line between x1, y1 and x2, y2,
@@ -207,6 +340,43 @@ void line(BITMAP *bmp, int x1, int y1, int x2, int y2, int color)
    do_line(bmp, x1, y1, x2, y2, color, putpixel);
 
    bmp->clip = clip;
+}
+
+
+
+/* rect:
+ *  Draws an outline rectangle.
+ */
+void rect(BITMAP *bmp, int x1, int y1, int x2, int y2, int color)
+{
+   int t;
+
+   if (x2 < x1) 
+   {
+      t = x1;
+      x1 = x2;
+      x2 = t;
+   }
+
+   if (y2 < y1) 
+   {
+      t = y1;
+      y1 = y2;
+      y2 = t;
+   }
+
+   hline(bmp, x1, y1, x2, color);
+
+   if (y2 > y1)
+      hline(bmp, x1, y2, x2, color);
+
+   if (y2-1 >= y1+1) 
+   {
+      vline(bmp, x1, y1+1, y2-1, color);
+
+      if (x2 > x1)
+         vline(bmp, x2, y1+1, y2-1, color);
+   }
 }
 
 
