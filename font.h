@@ -28,6 +28,7 @@ typedef struct FONT
 
 void *load_dat_font(PACKFILE *f, long size);
 void destroy_font(FONT *f);
+int char_length(const FONT *f, int ch);
 int text_length(const FONT *f, const char *str);
 int text_height(const FONT *f);
 void textout_ex(BITMAP *bmp, const FONT *f, const char *str, int x, int y,

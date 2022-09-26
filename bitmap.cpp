@@ -189,27 +189,50 @@ void masked_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy,
 /* draw_sprite:
  *  Draws a sprite onto a linear bitmap at the specified x, y position,
  *  using a masked drawing mode where zero pixels are not output.
+ *  Bounds check is only done at the top since that's the only one
+ *  required on ZC.
  */
 void draw_sprite(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
 {
-   masked_blit(sprite, bmp, 0, 0, dx, dy, sprite->w, sprite->h);
+   int sy = 0;
+   
+   if (dy < 0)
+   {
+      if(dy + sprite->h - 1 < 0)
+         return;
+
+      sy = -dy;
+      dy = 0;
+   }
+
+   masked_blit(sprite, bmp, 0, sy, dx, dy, sprite->w, sprite->h - sy);
 }
 
 
 /* draw_sprite_v_flip:
  *  Draws a sprite to a linear bitmap, flipping vertically.
+ *  Bounds check is only done at the top since that's the only one
+ *  required on ZC.
  */
 void draw_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int dx, int dy)
 {
-   int x, y;
    int h = sprite->h - 1;
+   
+   if (dy < 0)
+   {
+      if(dy + h < 0)
+         return;
 
-   for (y = 0; y <= h; y++)
+      h+= dy;
+      dy = 0;
+   }
+
+   for (int y = 0; y <= h; y++)
    {
       unsigned char *s = sprite->line[h - y];
       unsigned char *d = bmp->line[y + dy] + dx;
 
-      for (x = 0; x < sprite->w; s++, d++, x++)
+      for (int x = 0; x < sprite->w; s++, d++, x++)
       {
          unsigned char c = *s;
 
@@ -273,7 +296,7 @@ static struct
 } _al_stretch;
 
 
-static void stretch_line(unsigned char *dptr, unsigned char *sptr)
+static void stretch_line_normal(unsigned char *dptr, unsigned char *sptr)
 {
    int xc = _al_stretch.xcstart;
    unsigned char *dend = dptr + _al_stretch.linesize;
@@ -291,11 +314,30 @@ static void stretch_line(unsigned char *dptr, unsigned char *sptr)
 }
 
 
-/* stretch_blit:
- *  Opaque bitmap scaling function.
+static void stretch_line_masked(unsigned char *dptr, unsigned char *sptr)
+{
+   int xc = _al_stretch.xcstart;
+   unsigned char *dend = dptr + _al_stretch.linesize;
+   for (; dptr < dend; dptr++, sptr += _al_stretch.sxinc)
+   {
+      if (*sptr != MASKED_COLOR)
+         *dptr = *sptr;
+      if (xc <= 0)
+      {
+         sptr++;
+         xc += _al_stretch.xcinc;
+      }
+      else
+         xc -= _al_stretch.xcdec;
+   }
+}
+
+
+/* _stretch_blit:
+ *  Stretch blit work-horse.
  */
-void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
-                  int dx, int dy, int dw, int dh)
+static void _stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
+                  int dx, int dy, int dw, int dh, int masked)
 {
    int y; /* current dst y */
    int yc; /* y counter */
@@ -306,6 +348,7 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
    int dxbeg, dxend; /* clipping information */
    int dybeg, dyend;
    int i;
+   void (*stretch_line)(unsigned char *dptr, unsigned char *sptr) = NULL;
 
    if ((sw <= 0) || (sh <= 0) || (dw <= 0) || (dh <= 0))
       return;
@@ -369,6 +412,9 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
          yc -= ycdec;
    }
 
+   /* Select correct strecher */
+   stretch_line = masked ? stretch_line_masked : stretch_line_normal;
+
    /* Stretch it */
    for (; y < dyend; y++, sy += syinc)
    {
@@ -381,4 +427,33 @@ void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
       else
          yc -= ycdec;
    }
+}
+
+
+/* stretch_blit:
+ *  Opaque bitmap scaling function.
+ */
+void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
+                  int dx, int dy, int dw, int dh)
+{
+   _stretch_blit(src, dst, sx, sy, sw, sh, dx, dy, dw, dh, FALSE);
+}
+
+
+/* masked_stretch_blit:
+ *  Masked bitmap scaling function.
+ */
+void masked_stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
+                  int dx, int dy, int dw, int dh)
+{
+   _stretch_blit(src, dst, sx, sy, sw, sh, dx, dy, dw, dh, TRUE);
+}
+
+
+/* stretch_sprite:
+ *  Masked version of stretch_blit().
+ */
+void stretch_sprite(BITMAP *dst, BITMAP *src, int x, int y, int w, int h)
+{
+   _stretch_blit(src, dst, 0, 0, src->w, src->h, x, y, w, h, TRUE);
 }

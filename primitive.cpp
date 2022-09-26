@@ -50,11 +50,24 @@ static void hline_solid(BITMAP *bmp, int x1, int y, int x2, int color)
 
 
 /* vline_solid:
- *  Draws a vertical line onto a linear bitmap.
- * Warning: No bound check is performed */
+ *  Draws a vertical line onto a linear bitmap. 
+ */
 static void vline_solid(BITMAP *bmp, int x, int y1, int y2, int color)
 {
    int y;
+
+   if (bmp->clip)
+   {
+     if (y1 < bmp->ct)
+         y1 = bmp->ct;
+
+      if (y2 >= bmp->cb)
+         y2 = bmp->cb - 1;
+
+      if (x < bmp->cl || x >= bmp->cr)
+         return;
+   }
+
    for (y = y1; y <= y2; y++)
       *(bmp->line[y] + x) = color;
 }
@@ -119,11 +132,24 @@ static void hline_trans(BITMAP *bmp, int x1, int y, int x2, int color)
 
 /* vline_trans:
  *  Draws a vertical line onto a linear bitmap.
- * Warning: No bound check is performed */
+ */
 static void vline_trans(BITMAP *bmp, int x, int y1, int y2, int color)
 {
    int y, sc;
    unsigned char *p;
+
+   if (bmp->clip)
+   {
+     if (y1 < bmp->ct)
+         y1 = bmp->ct;
+
+      if (y2 >= bmp->cb)
+         y2 = bmp->cb - 1;
+
+      if (x < bmp->cl || x >= bmp->cr)
+         return;
+   }
+
    for (y = y1; y <= y2; y++)
    {
       p = bmp->line[y] + x;

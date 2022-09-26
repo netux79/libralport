@@ -32,6 +32,17 @@ void draw_trans_sprite(BITMAP *bmp, BITMAP *sprite, int dx, int dy);
 void set_clip_rect(BITMAP *bitmap, int x1, int y1, int x2, int y2);
 void stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
                   int dx, int dy, int dw, int dh);
+void masked_stretch_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int sw, int sh,
+int dx, int dy, int dw, int dh);
+void stretch_sprite(BITMAP *dst, BITMAP *src, int x, int y, int w, int h);
+inline void set_clip_state(BITMAP *bitmap, int state)
+{
+   bitmap->clip = state;
+}
+inline int is_sub_bitmap(BITMAP *bmp)
+{
+   return (bmp->dat == NULL);
+}
 
 #ifdef __cplusplus
 }

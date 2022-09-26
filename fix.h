@@ -5,6 +5,8 @@
 
 #ifdef __cplusplus
 
+extern fixed _cos_tbl[];
+
 class fix      /* C++ wrapper for the fixed point routines */
 {
 public:
@@ -243,6 +245,16 @@ inline fixed itofix(int x)
 inline int fixtoi(fixed x)
 {
    return fixfloor(x) + ((x & 0x8000) >> 15);
+}
+
+inline fixed fixcos(fixed x)
+{
+   return _cos_tbl[((x + 0x4000) >> 15) & 0x1FF];
+}
+
+inline fixed fixsin(fixed x)
+{
+   return _cos_tbl[((x - 0x400000 + 0x4000) >> 15) & 0x1FF];
 }
 
 /* sepapator */

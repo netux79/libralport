@@ -42,6 +42,7 @@ static FONT *read_font(PACKFILE *pack)
    f->first = pack_mgetl(pack);
    f->last = pack_mgetl(pack) + 1;
    f->total_glyphs = f->last - f->first;
+   f->height = 0; /* initial value */
 
    gl = (FONT_GLYPH *)malloc(sizeof(FONT_GLYPH) * f->total_glyphs);
    if (!gl)
@@ -125,7 +126,7 @@ static FONT_GLYPH *_find_glyph(const FONT *f, int ch)
 /* char_length:
  *  Returns the length, in pixels, of a character as rendered.
  */
-static int char_length(const FONT *f, int ch)
+int char_length(const FONT *f, int ch)
 {
    FONT_GLYPH *g = _find_glyph(f, ch);
    return g ? g->width : 0;
