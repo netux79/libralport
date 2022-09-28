@@ -968,28 +968,8 @@ void deallocate_voice(int voice)
  */
 void mixer_set_volume(int volume)
 {
-   int *voice_vol;
-   int i;
-
    if (volume >= 0)
-   {
-      voice_vol = (int *)malloc(sizeof(int) * mix_voices);
-
-      /* Retrieve the (relative) volume of each voice. */
-      for (i = 0; i < mix_voices; i++)
-         voice_vol[i] = voice_get_volume(i);
-
       mix_volume = CLAMP(0, volume, 255);
-
-      /* Set the new (relative) volume for each voice. */
-      for (i = 0; i < mix_voices; i++)
-      {
-         if (voice_vol[i] >= 0)
-            voice_set_volume(i, voice_vol[i]);
-      }
-
-      free(voice_vol);
-   }
 }
 
 
