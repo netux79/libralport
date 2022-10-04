@@ -150,9 +150,10 @@ void clear_bitmap(BITMAP *bitmap)
 void blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy, int w,
           int h)
 {
-   int y;
+   if ((dy + h) > dst->h)
+      h = dst->h - dy;
 
-   for (y = 0; y < h; y++)
+   for (int y = 0; y < h; y++)
    {
       unsigned char *s = src->line[y + sy] + sx;
       unsigned char *d = dst->line[y + dy] + dx;
@@ -164,18 +165,20 @@ void blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy, int w,
 
 /* masked_blit:
  *  Masked (skipping transparent pixels) blitting routine.
+ * It only validates bottom edge as it seems the only one necessary for ZC.
  */
 void masked_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy,
                  int w, int h)
 {
-   int x, y;
+   if ((dy + h) > dst->h)
+      h = dst->h - dy;
 
-   for (y = 0; y < h; y++)
+   for (int y = 0; y < h; y++)
    {
       unsigned char *s = src->line[y + sy] + sx;
       unsigned char *d = dst->line[y + dy] + dx;
 
-      for (x = 0; x < w; s++, d++, x++)
+      for (int x = 0; x < w; s++, d++, x++)
       {
          unsigned char c = *s;
 

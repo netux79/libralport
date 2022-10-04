@@ -34,14 +34,20 @@ static void hline_solid(BITMAP *bmp, int x1, int y, int x2, int color)
 {
    if (bmp->clip)
    {
-     if (x1 < bmp->cl)
+      if (x1 >= bmp->cr)
+         return;
+
+      if (x2 < bmp->cl)
+         return;
+
+      if (y < bmp->ct || y >= bmp->cb)
+         return;
+
+      if (x1 < bmp->cl)
          x1 = bmp->cl;
 
       if (x2 >= bmp->cr)
          x2 = bmp->cr - 1;
-
-      if (y < bmp->ct || y >= bmp->cb)
-         return;
    }
 
    unsigned char *d = bmp->line[y] + x1;
@@ -108,14 +114,20 @@ static void hline_trans(BITMAP *bmp, int x1, int y, int x2, int color)
 {
    if (bmp->clip)
    {
+      if (x1 >= bmp->cr)
+         return;
+
+      if (x2 < bmp->cl)
+         return;
+
+      if (y < bmp->ct || y >= bmp->cb)
+         return;
+
      if (x1 < bmp->cl)
          x1 = bmp->cl;
 
       if (x2 >= bmp->cr)
          x2 = bmp->cr - 1;
-
-      if (y < bmp->ct || y >= bmp->cb)
-         return;
    }
 
    int sc;
