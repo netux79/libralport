@@ -153,6 +153,9 @@ void blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy, int w,
    if ((dy + h) > dst->h)
       h = dst->h - dy;
 
+   if (sy + h > src->h)
+      h = src->h - sy;
+
    for (int y = 0; y < h; y++)
    {
       unsigned char *s = src->line[y + sy] + sx;
@@ -172,6 +175,9 @@ void masked_blit(BITMAP *src, BITMAP *dst, int sx, int sy, int dx, int dy,
 {
    if ((dy + h) > dst->h)
       h = dst->h - dy;
+
+   if (sy + h > src->h)
+      h = src->h - sy;
 
    for (int y = 0; y < h; y++)
    {
