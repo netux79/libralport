@@ -94,6 +94,7 @@ void stream_fill_buffer(void)
       buf[i] ^= 0x8000;
 
    /* queue the samples into the mixer */
+   voice_set_position(stream_voice, 0); /* reset it in case it needs it */
    voice_start(stream_voice);
 }
 

@@ -1006,8 +1006,7 @@ int voice_get_position(int voice)
 {
    if (mixer_voice[voice].sample)
    {
-      if ((!mixer_voice[voice].playing)
-            || (mixer_voice[voice].pos >= mixer_voice[voice].len))
+      if (mixer_voice[voice].pos >= mixer_voice[voice].len)
          return -1;
 
       return (mixer_voice[voice].pos >> MIX_FIX_SHIFT);
@@ -1143,7 +1142,9 @@ void voice_start(int voice)
 {
    if (mixer_voice[voice].sample)
    {
-      mixer_voice[voice].pos = 0;
+      if (mixer_voice[voice].pos >= mixer_voice[voice].len)
+         mixer_voice[voice].pos = 0;
+
       mixer_voice[voice].playing = TRUE;
    }
 }
